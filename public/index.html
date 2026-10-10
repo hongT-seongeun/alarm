@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>간단 알림</title>
+  <meta name="theme-color" content="#3b6ef5">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <h1>⏰ 간단 알림</h1>
+
+    <section class="card" id="perm-card">
+      <p id="perm-text">알림이 꺼져 있어요. 먼저 알림을 켜 주세요.</p>
+      <button type="button" id="perm-btn" class="btn secondary">알림 켜기</button>
+    </section>
+
+    <form class="card" id="alarm-form">
+      <label>
+        날짜
+        <input type="date" id="date" required>
+      </label>
+      <label>
+        시간
+        <input type="time" id="time" required>
+      </label>
+      <label>
+        알림 문구
+        <input type="text" id="message" maxlength="60" placeholder="예: 5교시 수업 준비" required>
+      </label>
+      <button type="submit" class="btn">알림 등록</button>
+      <p class="error" id="error" role="alert"></p>
+    </form>
+
+    <section class="card">
+      <h2>내 알림</h2>
+      <ul id="list" class="list"></ul>
+      <p id="empty" class="empty">등록된 알림이 없어요.</p>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
