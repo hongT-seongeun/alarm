@@ -1,14 +1,10 @@
 var subscription = null;
+var repeat = 'once';
+var selectedDays = [];
 
-var form = document.getElementById('alarm-form');
-var dateEl = document.getElementById('date');
-var timeEl = document.getElementById('time');
-var msgEl = document.getElementById('message');
-var errorEl = document.getElementById('error');
-var listEl = document.getElementById('list');
-var emptyEl = document.getElementById('empty');
-var permBtn = document.getElementById('perm-btn');
-var permText = document.getElementById('perm-text');
+var $ = function (id) { return document.getElementById(id); };
+var form = $('alarm-form');
+var errorEl = $('error');
 
 function api(path, body) {
   return fetch(path, {
@@ -42,9 +38,24 @@ function formatWhen(ms) {
   });
 }
 
-function showPermState(on, text) {
-  permText.textContent = text;
-  permBtn.hidden = on;
+var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+var DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function repeatLabel(a) {
+  if (a.repeat === 'daily') return '매일';
+  if (a.repeat === 'weekdays') return '평일';
+  if (a.repeat === 'custom') {
+    return DAY_ORDER.filter(function (d) { return a.days.indexOf(d) !== -1; })
+      .map(function (d) { return DAY_NAMES[d]; }).join('·');
+  }
+  return '';
+}
+
+// 알림 권한 카드: on(켜짐) / off(꺼짐, 버튼 보임) / info(안내만)
+function setPerm(state, text) {
+  $('perm-card').classList.toggle('on', state === 'on');
+  $('perm-text').textContent = text;
+  $('perm-btn').hidden = state !== 'off';
 }
 
 function isIos() {
@@ -55,44 +66,85 @@ function isStandalone() {
     window.matchMedia('(display-mode: standalone)').matches;
 }
 
-function render(alarms) {
-  listEl.innerHTML = '';
+function renderAlarms(alarms) {
+  var list = $('list');
+  list.innerHTML = '';
   alarms.forEach(function (a) {
     var li = document.createElement('li');
-    var info = document.createElement('div');
+    var main = document.createElement('div');
+    main.className = 'item-main';
+
     var when = document.createElement('div');
     when.className = 'item-when';
     when.textContent = formatWhen(a.fireAt);
+    var label = repeatLabel(a);
+    if (label) {
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = '🔁 ' + label;
+      when.appendChild(badge);
+    }
+
     var msg = document.createElement('div');
     msg.className = 'item-msg';
     msg.textContent = a.message;
-    info.appendChild(when);
-    info.appendChild(msg);
+
+    main.appendChild(when);
+    main.appendChild(msg);
 
     var del = document.createElement('button');
     del.type = 'button';
     del.className = 'del';
-    del.textContent = '삭제';
+    del.setAttribute('aria-label', '삭제');
+    del.textContent = '✕';
     del.addEventListener('click', function () {
       api('/api/alarms/delete', { endpoint: subscription.endpoint, id: a.id })
         .then(loadList)
         .catch(function (e) { errorEl.textContent = e.message; });
     });
 
-    li.appendChild(info);
+    li.appendChild(main);
     li.appendChild(del);
-    listEl.appendChild(li);
+    list.appendChild(li);
   });
-  emptyEl.style.display = alarms.length ? 'none' : 'block';
+  $('empty').hidden = alarms.length > 0;
+  $('count').textContent = alarms.length ? alarms.length + '개' : '';
+}
+
+function renderHistory(history) {
+  var ul = $('history');
+  ul.innerHTML = '';
+  history.forEach(function (h) {
+    var li = document.createElement('li');
+    var main = document.createElement('div');
+    main.className = 'item-main';
+    var when = document.createElement('div');
+    when.className = 'item-when';
+    when.textContent = formatWhen(h.firedAt);
+    var msg = document.createElement('div');
+    msg.className = 'item-msg';
+    msg.textContent = h.message;
+    main.appendChild(when);
+    main.appendChild(msg);
+    li.appendChild(main);
+    ul.appendChild(li);
+  });
+  $('hist-empty').hidden = history.length > 0;
+  $('hist-clear').hidden = history.length === 0;
+  $('hist-count').textContent = history.length ? history.length + '개' : '';
 }
 
 function loadList() {
   if (!subscription) {
-    render([]);
+    renderAlarms([]);
+    renderHistory([]);
     return Promise.resolve();
   }
   return api('/api/alarms/list', { endpoint: subscription.endpoint })
-    .then(function (data) { render(data.alarms); })
+    .then(function (data) {
+      renderAlarms(data.alarms);
+      renderHistory(data.history);
+    })
     .catch(function (e) { errorEl.textContent = e.message; });
 }
 
@@ -100,7 +152,7 @@ function enableNotifications() {
   errorEl.textContent = '';
   return Notification.requestPermission().then(function (perm) {
     if (perm !== 'granted') {
-      showPermState(false, '알림이 막혀 있어요. 핸드폰 설정에서 이 앱의 알림을 허용해 주세요.');
+      setPerm('off', '알림이 막혀 있어요. 핸드폰 설정에서 이 앱의 알림을 허용해 주세요.');
       return;
     }
     return navigator.serviceWorker.ready
@@ -114,13 +166,36 @@ function enableNotifications() {
       })
       .then(function (sub) {
         subscription = sub.toJSON();
-        showPermState(true, '알림이 켜져 있어요. ✅');
+        setPerm('on', '알림이 켜져 있어요');
         return loadList();
       });
   }).catch(function (e) {
     errorEl.textContent = '알림을 켜지 못했어요: ' + e.message;
   });
 }
+
+// 반복 선택
+$('repeat-seg').addEventListener('click', function (e) {
+  var btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  repeat = btn.dataset.repeat;
+  document.querySelectorAll('.seg-btn').forEach(function (b) {
+    var on = b === btn;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  $('days-field').hidden = repeat !== 'custom';
+});
+
+// 요일 선택
+$('days').addEventListener('click', function (e) {
+  var btn = e.target.closest('.day');
+  if (!btn) return;
+  var d = Number(btn.dataset.day);
+  var i = selectedDays.indexOf(d);
+  if (i === -1) selectedDays.push(d); else selectedDays.splice(i, 1);
+  btn.setAttribute('aria-pressed', i === -1 ? 'true' : 'false');
+});
 
 form.addEventListener('submit', function (e) {
   e.preventDefault();
@@ -129,32 +204,59 @@ form.addEventListener('submit', function (e) {
     errorEl.textContent = '먼저 위에서 "알림 켜기"를 눌러 주세요.';
     return;
   }
-  var fireAt = new Date(dateEl.value + 'T' + timeEl.value + ':00+09:00').getTime();
+  var fireAt = new Date($('date').value + 'T' + $('time').value + ':00+09:00').getTime();
   if (!(fireAt > Date.now())) {
     errorEl.textContent = '지금보다 이후의 시간을 골라 주세요.';
+    return;
+  }
+  if (repeat === 'custom' && selectedDays.length === 0) {
+    errorEl.textContent = '반복할 요일을 하나 이상 골라 주세요.';
     return;
   }
   api('/api/alarms/add', {
     subscription: subscription,
     fireAt: fireAt,
-    message: msgEl.value.trim()
+    message: $('message').value.trim(),
+    repeat: repeat,
+    days: repeat === 'custom' ? selectedDays.slice() : []
   }).then(function () {
-    msgEl.value = '';
+    $('message').value = '';
     return loadList();
   }).catch(function (err) {
     errorEl.textContent = err.message;
   });
 });
 
-permBtn.addEventListener('click', enableNotifications);
+$('hist-clear').addEventListener('click', function () {
+  api('/api/history/clear', { endpoint: subscription.endpoint })
+    .then(loadList)
+    .catch(function (e) { errorEl.textContent = e.message; });
+});
+
+$('perm-btn').addEventListener('click', enableNotifications);
+
+// 앱으로 돌아왔을 때 목록을 새로 불러옵니다 (닫혀 있는 동안 울린 알림 반영).
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') loadList();
+});
+
+function pad(n) { return (n < 10 ? '0' : '') + n; }
 
 function init() {
-  render([]);
+  // 기본 날짜·시간: 내일 아침 8시
+  var t = new Date();
+  t.setDate(t.getDate() + 1);
+  $('date').value = t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  $('time').value = '08:00';
+
+  renderAlarms([]);
+  renderHistory([]);
+
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     if (isIos() && !isStandalone()) {
-      showPermState(true, '아이폰은 사파리 아래쪽 공유 버튼(⬆️) → "홈 화면에 추가"로 설치한 뒤, 홈 화면의 아이콘으로 열어 주세요.');
+      setPerm('info', '아이폰은 사파리 아래쪽 공유 버튼(⬆️) → "홈 화면에 추가"로 설치한 뒤, 홈 화면의 아이콘으로 열어 주세요.');
     } else {
-      showPermState(true, '이 브라우저는 알림을 지원하지 않아요. 크롬(안드로이드)이나 사파리(아이폰)를 써 주세요.');
+      setPerm('info', '이 브라우저는 알림을 지원하지 않아요. 크롬(안드로이드)이나 사파리(아이폰)를 써 주세요.');
     }
     return;
   }
@@ -165,11 +267,13 @@ function init() {
     .then(function (sub) {
       if (sub && Notification.permission === 'granted') {
         subscription = sub.toJSON();
-        showPermState(true, '알림이 켜져 있어요. ✅');
+        setPerm('on', '알림이 켜져 있어요');
         return loadList();
       }
       if (Notification.permission === 'denied') {
-        showPermState(false, '알림이 막혀 있어요. 핸드폰 설정에서 이 앱의 알림을 허용해 주세요.');
+        setPerm('off', '알림이 막혀 있어요. 핸드폰 설정에서 이 앱의 알림을 허용해 주세요.');
+      } else {
+        setPerm('off', '알림이 꺼져 있어요');
       }
     })
     .catch(function (e) {

@@ -4,41 +4,94 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>간단 알림</title>
-  <meta name="theme-color" content="#3b6ef5">
+  <meta name="theme-color" content="#4f46e5">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="app">
-    <h1>⏰ 간단 알림</h1>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="logo" aria-hidden="true">⏰</div>
+      <div>
+        <h1>간단 알림</h1>
+        <p>정한 시각에 핸드폰으로 알려 드려요</p>
+      </div>
+    </div>
+  </header>
 
-    <section class="card" id="perm-card">
-      <p id="perm-text">알림이 꺼져 있어요. 먼저 알림을 켜 주세요.</p>
-      <button type="button" id="perm-btn" class="btn secondary">알림 켜기</button>
+  <main class="app">
+    <section class="card perm" id="perm-card">
+      <div class="perm-row">
+        <span class="dot" id="perm-dot"></span>
+        <p id="perm-text">알림 상태를 확인하는 중이에요…</p>
+      </div>
+      <button type="button" id="perm-btn" class="btn small" hidden>알림 켜기</button>
     </section>
 
     <form class="card" id="alarm-form">
-      <label>
-        날짜
-        <input type="date" id="date" required>
-      </label>
-      <label>
-        시간
-        <input type="time" id="time" required>
-      </label>
-      <label>
-        알림 문구
+      <h2>새 알림</h2>
+
+      <label class="field">
+        <span>알림 문구</span>
         <input type="text" id="message" maxlength="60" placeholder="예: 5교시 수업 준비" required>
       </label>
+
+      <div class="row">
+        <label class="field">
+          <span>날짜</span>
+          <input type="date" id="date" required>
+        </label>
+        <label class="field">
+          <span>시간</span>
+          <input type="time" id="time" required>
+        </label>
+      </div>
+
+      <div class="field">
+        <span>반복</span>
+        <div class="seg" id="repeat-seg" role="radiogroup" aria-label="반복">
+          <button type="button" class="seg-btn on" data-repeat="once" role="radio" aria-checked="true">한 번만</button>
+          <button type="button" class="seg-btn" data-repeat="daily" role="radio" aria-checked="false">매일</button>
+          <button type="button" class="seg-btn" data-repeat="weekdays" role="radio" aria-checked="false">평일</button>
+          <button type="button" class="seg-btn" data-repeat="custom" role="radio" aria-checked="false">요일 선택</button>
+        </div>
+      </div>
+
+      <div class="field" id="days-field" hidden>
+        <span>반복할 요일</span>
+        <div class="days" id="days">
+          <button type="button" class="day" data-day="1" aria-pressed="false">월</button>
+          <button type="button" class="day" data-day="2" aria-pressed="false">화</button>
+          <button type="button" class="day" data-day="3" aria-pressed="false">수</button>
+          <button type="button" class="day" data-day="4" aria-pressed="false">목</button>
+          <button type="button" class="day" data-day="5" aria-pressed="false">금</button>
+          <button type="button" class="day" data-day="6" aria-pressed="false">토</button>
+          <button type="button" class="day" data-day="0" aria-pressed="false">일</button>
+        </div>
+      </div>
+
       <button type="submit" class="btn">알림 등록</button>
       <p class="error" id="error" role="alert"></p>
     </form>
 
     <section class="card">
-      <h2>내 알림</h2>
+      <h2>내 알림 <span class="count" id="count"></span></h2>
       <ul id="list" class="list"></ul>
-      <p id="empty" class="empty">등록된 알림이 없어요.</p>
+      <div id="empty" class="empty">
+        <div class="empty-icon">🔔</div>
+        <p>등록된 알림이 없어요.<br>위에서 새 알림을 만들어 보세요.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="head-row">
+        <h2>지난 알림 <span class="count" id="hist-count"></span></h2>
+        <button type="button" id="hist-clear" class="link-btn" hidden>기록 비우기</button>
+      </div>
+      <ul id="history" class="list history"></ul>
+      <p id="hist-empty" class="muted">아직 울린 알림이 없어요.</p>
+      <p class="muted note">최근 20개까지 보관돼요.</p>
     </section>
   </main>
 
